@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require("dotenv")
-const { Client } = require('pg');
+const { Pool } = require('pg');
+
 
 dotenv.config()
 
@@ -8,19 +9,14 @@ const app = express();
 const port = process.env.PORT;
 
 // Connect to Postgres
-const client = new Client({
+const client = new Pool({
     host: process.env.PGHOST,
     port: process.env.PGPORT,
     user: process.env.PGUSER,
     password: process.env.PGPASSWORD,
     database: process.env.PGDATABASE,
-    keepAlive: true,
-    ssl: true,
-    sslmode: process.env.PGSSLMODE,
-    ssl: {
-        rejectUnauthorized: false
-    },
-    connectionTimeoutMillis: 5000
+    idleTimeoutMillis: 0,
+    connectionTimeoutMillis: 0,
 });
 
 // Connect to Postgres with a callback
@@ -31,8 +27,6 @@ client.connect((err) => {
         console.log('Connected to database');
     }
 });
-
-
 
 app.get('/', (req, res) => {
     res.send('Hello World testing!');
