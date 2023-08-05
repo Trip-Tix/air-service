@@ -17,6 +17,9 @@ const client = new Pool({
     database: process.env.PGDATABASE,
     idleTimeoutMillis: 0,
     connectionTimeoutMillis: 0,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 // Connect to Postgres with a callback
