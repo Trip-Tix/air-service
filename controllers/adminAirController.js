@@ -42,6 +42,6 @@ const getAirInfo = async (req, res) => {
 }
 
 module.exports = {
-    getBusInfo
+    getAirInfo
 }
 
