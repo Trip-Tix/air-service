@@ -11,6 +11,7 @@ router.post('/api/admin/getClassInfo', bodyParser, adminAirController.getClassIn
 // Add air class info
 router.post('/api/admin/addClassInfo', bodyParser, adminAirController.addClassInfo);
 
-
+// Get single air layout details
+router.post('/api/admin/getAirLayout', bodyParser, adminAirController.getAirLayout);
 
 module.exports = router;
