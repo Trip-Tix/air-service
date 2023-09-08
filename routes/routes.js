@@ -20,4 +20,7 @@ router.post('/api/admin/getUniqueAirIdList', bodyParser, adminAirController.getU
 // add air info
 router.post('/api/admin/addAirInfo', bodyParser, adminAirController.addAirInfo);
 
+// Get air info from admin
+router.post('/api/admin/getAirInfo', bodyParser, adminAirController.getAirInfo);
+
 module.exports = router;

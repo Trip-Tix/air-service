@@ -346,11 +346,135 @@ const addAirInfo = async (req, res) => {
     });
 }
 
+
+
+// Get air information
+const getAirInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, airCompanyName} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            return res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        }
+        try {
+            console.log("getAirInfo called from air-service");
+            console.log(req.body);
+
+            // Get the air id
+            const airIdQuery = {
+                text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                values: [airCompanyName]
+            };
+            const airIdResult = await airPool.query(airIdQuery);
+            const airId = airIdResult.rows[0].air_company_id;
+            console.log("Air id", airId);
+
+            let result = [];
+
+            // Get the unique air id list
+            const uniqueAirIdQuery = {
+                text: 'SELECT unique_air_id, class_info, facilities, number_of_seats FROM air_class_details WHERE air_company_id = $1',
+                values: [airId]
+            };
+            const uniqueAirIdResult = await airPool.query(uniqueAirIdQuery);
+            const uniqueAirIdList = uniqueAirIdResult.rows;
+
+            // iterate through each unique flight id
+            for (let i = 0; i < uniqueAirIdList.length; i++) {
+                const classIds = uniqueAirIdList[i].class_info;
+
+                let layouts = [];
+                let eachNumOfSeats = [];
+                let layoutIds = [];
+                let class_names = [];
+                for (let i = 0; i < classIds.length; i++) {
+                    const classId = classIds[i];
+
+                    // Get the class name
+                    const classNameQuery = {
+                        text: 'SELECT class_name FROM class_info WHERE class_id = $1',
+                        values: [classId]
+                    };
+                    const classNameResult = await airPool.query(classNameQuery);
+                    const className = classNameResult.rows[0].class_name;
+                    class_names.push(className);
+
+                    let queryText = `SELECT air_layout_info.air_layout_id, air_layout_info.number_of_seats, air_layout_info.row, air_layout_info.col
+                                    FROM air_layout_info
+                                    WHERE air_layout_info.air_company_id = $1 AND air_layout_info.class_id = $2`;
+                    let queryValues = [airId, classId];
+
+                    const query = {
+                        text: queryText,
+                        values: queryValues
+                    };
+                    const result = await airPool.query(query);
+                    
+                    let layoutInfoArray = result.rows;
+
+                    // if (layoutInfoArray.length === 0) {
+                    //     return res.status(200).json({
+                    //         layout: [],
+                    //     });
+                    // }
+                    
+                    let layoutInfo = layoutInfoArray[0];
+                    // Get seat details for each layout
+                    let seatQuery = {
+                        text: `SELECT air_seat_details.seat_name, air_seat_details.is_seat, air_seat_details.row_id, air_seat_details.col_id
+                        FROM air_seat_details WHERE air_seat_details.air_layout_id = $1`,
+                        values: [layoutInfo.air_layout_id]
+                    };
+
+                    const seatResult = await airPool.query(seatQuery);
+                    let seatDetails = seatResult.rows;
+                    let layout = [];
+                    for (let i = 0; i < layoutInfo.row; i++) {
+                        layout.push(new Array(layoutInfo.col).fill(0));
+                    }
+                    for (let i = 0; i < seatDetails.length; i++) {
+                        let seat = seatDetails[i];
+                        if (seat.is_seat) {
+                            layout[seat.row_id][seat.col_id] = 1;
+                        }
+                    }
+                    layouts.push(layout);
+                    eachNumOfSeats.push(layoutInfo.number_of_seats);
+                    layoutIds.push(layoutInfo.air_layout_id);
+                    layoutInfo.layout = layout;
+                }
+
+                uniqueAirIdList[i].layouts = layouts;
+                uniqueAirIdList[i].eachNumOfSeats = eachNumOfSeats;
+                uniqueAirIdList[i].layoutIds = layoutIds;
+                uniqueAirIdList[i].class_names = class_names;
+            }
+            
+            console.log(uniqueAirIdList);
+            res.status(200).json(uniqueAirIdList);
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ message: error.message });
+        }
+    });
+}
+
+
 module.exports = {
     getClassInfo,
     addClassInfo,
     getAirLayout,
     getUniqueAirIdList,
     addAirInfo,
+    getAirInfo,
 }
 
