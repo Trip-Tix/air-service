@@ -23,4 +23,7 @@ router.post('/api/admin/addAirInfo', bodyParser, adminAirController.addAirInfo);
 // Get air info from admin
 router.post('/api/admin/getAirInfo', bodyParser, adminAirController.getAirInfo);
 
+// Get air location list from admin
+router.post('/api/admin/getAirLocations', bodyParser, adminAirController.getAirLocations);
+
 module.exports = router;

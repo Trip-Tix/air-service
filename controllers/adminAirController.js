@@ -332,7 +332,7 @@ const addAirInfo = async (req, res) => {
                 }
 
                 console.log("Air Info added");
-                res.status(200).json({ message: 'Bus Info added' });
+                res.status(200).json({ message: 'Air Info added' });
             } catch (error) {
                 // Rollback transaction
                 await airPool.query('ROLLBACK');
@@ -469,6 +469,43 @@ const getAirInfo = async (req, res) => {
 }
 
 
+// Get locations
+const getAirLocations = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token} = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getAirLocations called from air-service");
+                const query = {
+                    text: 'SELECT * FROM location_info'
+                };
+                const result = await airPool.query(query);
+                const locations = result.rows;
+                console.log(locations);
+                res.status(200).json(locations);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+
 module.exports = {
     getClassInfo,
     addClassInfo,
@@ -476,5 +513,6 @@ module.exports = {
     getUniqueAirIdList,
     addAirInfo,
     getAirInfo,
+    getAirLocations,
 }
 
