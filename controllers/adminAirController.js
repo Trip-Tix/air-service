@@ -136,7 +136,9 @@ const getAirLayout = async (req, res) => {
                 let airInfo = result.rows;
 
                 if (airInfo.length === 0) {
-                    return res.status(200).json([]);
+                    return res.status(200).json({
+                        layout: [],
+                    });
                 }
 
                 for (let i = 0; i < airInfo.length; i++) {
@@ -163,7 +165,7 @@ const getAirLayout = async (req, res) => {
                     layoutInfo.layout = layout;
                 }
                 console.log(airInfo[0]);                
-                res.status(200).json();
+                res.status(200).json(airInfo[0]);
             } catch(error) {
                 console.log(error);
                 res.status(500).json({ message: error.message })
@@ -172,9 +174,58 @@ const getAirLayout = async (req, res) => {
     });
 }
 
+
+
+// Get unique air id for each air from air class details table
+const getUniqueAirIdList = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, airCompanyName} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getUniqueAirId called from air-service");
+                console.log(req.body);
+                // Get the air id from air company name
+                const airIdQuery = { 
+                    text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                    values: [airCompanyName]
+                };
+                const airIdResult = await airPool.query(airIdQuery);
+                const airId = airIdResult.rows[0].air_company_id;
+                console.log("Air id", airId);
+
+                // Get the unique air id from air class details table
+                const query = {
+                    text: 'SELECT unique_air_id FROM air_class_details WHERE air_company_id = $1',
+                    values: [airId]
+                };
+                const result = await airPool.query(query);
+                const uniqueAirId = result.rows;
+                console.log(uniqueAirId);
+                res.status(200).json(uniqueAirId);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
 module.exports = {
     getClassInfo,
     addClassInfo,
-    getAirLayout
+    getAirLayout,
+    getUniqueAirIdList
 }
 
