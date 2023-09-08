@@ -17,4 +17,7 @@ router.post('/api/admin/getAirLayout', bodyParser, adminAirController.getAirLayo
 // Get unique air id list from admin
 router.post('/api/admin/getUniqueAirIdList', bodyParser, adminAirController.getUniqueAirIdList);
 
+// add air info
+router.post('/api/admin/addAirInfo', bodyParser, adminAirController.addAirInfo);
+
 module.exports = router;

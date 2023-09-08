@@ -222,10 +222,135 @@ const getUniqueAirIdList = async (req, res) => {
     });
 }
 
+
+// Add air info
+const addAirInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const { token, airCompanyName, classes, numFlight, uniqueFlightId, numSeats, layouts, rows, cols, facilities } = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+
+                console.log({
+                    airCompanyName,
+                    classes,
+                    numFlight,
+                    uniqueFlightId,
+                    numSeats,
+                    layouts,
+                    rows,
+                    cols,
+                    facilities
+                })
+                // Begin transaction
+                await airPool.query('BEGIN');
+                //get air_company_id from air_services
+                const airIdQuery = {
+                    text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                    values: [airCompanyName]
+                };
+                const airIdResult = await airPool.query(airIdQuery);
+                const airId = airIdResult.rows[0].air_company_id;
+                console.log("Air id", airId);
+
+                const numberOfTotalSeats = numSeats.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
+                console.log(numberOfTotalSeats);
+                
+                const classIds = classes.map(classObj => classObj.classId);
+                console.log(classIds);
+
+                // iterate through each unique flight id
+                for (let i = 0; i < uniqueFlightId.length; i++) {
+                    const flightId = uniqueFlightId[i];
+
+                    // add flightId, airId, classIds, facilities, numberOfTotalSeats to air_class_details
+                    const airClassDetailsQuery = {
+                        text: 'INSERT INTO air_class_details (unique_air_id, air_company_id, class_info, facilities, number_of_seats) VALUES ($1, $2, $3, $4, $5)',
+                        values: [flightId, airId, classIds, facilities, numberOfTotalSeats]
+                    };
+                    await airPool.query(airClassDetailsQuery);
+                    console.log("Air Class Details added");
+                }
+                    
+
+                for (let i = 0; i < classIds.length; i++) {
+                    const numberOfSeats = numSeats[i];
+                    const row = rows[i];
+                    const col = cols[i];
+                    const classId = classIds[i];
+                    
+                    if (row != -1 || col != -1) {
+                        // add airId, numberOfSeats, row, col, classId to air_layout_info
+                        const airLayoutInfoQuery = {
+                            text: 'INSERT INTO air_layout_info (air_company_id, number_of_seats, row, col, class_id) VALUES ($1, $2, $3, $4, $5)',
+                            values: [airId, numberOfSeats, row, col, classId]
+                        };
+                        await airPool.query(airLayoutInfoQuery);
+                        console.log("Air Layout Info added");
+                        
+                        // get air_layout_id from air_layout_info
+                        const airLayoutIdQuery = {
+                            text: 'SELECT air_layout_id FROM air_layout_info WHERE air_company_id = $1 AND class_id = $2',
+                            values: [airId, classId]
+                        };
+                        const airLayoutIdResult = await airPool.query(airLayoutIdQuery);
+                        const airLayoutId = airLayoutIdResult.rows[0].air_layout_id;
+                        console.log("Air Layout Id", airLayoutId);
+
+                        // insert into air_seat_details table
+                        for (let j = 0; j < row; j++) {
+                            column_count = 0;
+                            for (let k = 0; k < col; k++) {
+                                seatName = null;
+                                const isSeat = layouts[i][j][k];
+                                
+                                if (isSeat != 0) {
+                                    seatName = String.fromCharCode(65 + j) + (column_count + 1);
+                                    column_count++;
+                                }
+
+                                const seatQuery = {
+                                    text: 'INSERT INTO air_seat_details (air_layout_id, seat_name, is_seat, row_id, col_id) VALUES ($1, $2, $3, $4, $5)',
+                                    values: [airLayoutId, seatName, isSeat, j, k]
+                                };
+                                await airPool.query(seatQuery);
+                            }
+                        }
+                        console.log("Air Seat Details added");
+                    }
+                }
+
+                console.log("Air Info added");
+                res.status(200).json({ message: 'Bus Info added' });
+            } catch (error) {
+                // Rollback transaction
+                await airPool.query('ROLLBACK');
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            } finally {
+                // End transaction
+                await airPool.query('COMMIT');
+            }
+        }
+    });
+}
+
 module.exports = {
     getClassInfo,
     addClassInfo,
     getAirLayout,
-    getUniqueAirIdList
+    getUniqueAirIdList,
+    addAirInfo,
 }
 
