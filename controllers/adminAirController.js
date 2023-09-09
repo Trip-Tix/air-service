@@ -257,13 +257,24 @@ const addAirInfo = async (req, res) => {
                 await airPool.query('BEGIN');
                 //get air_company_id from air_services
                 const airIdQuery = {
-                    text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                    text: 'SELECT air_company_id, number_of_planes FROM air_services WHERE air_company_name = $1',
                     values: [airCompanyName]
                 };
                 const airIdResult = await airPool.query(airIdQuery);
                 const airId = airIdResult.rows[0].air_company_id;
+                numberOfPlanes = airIdResult.rows[0].number_of_planes;
                 console.log("Air id", airId);
 
+                numberOfPlanes += numFlight;
+
+                // update number_of_planes in air_services
+                const updateNumberOfPlanesQuery = {
+                    text: 'UPDATE air_services SET number_of_planes = $1 WHERE air_company_id = $2',
+                    values: [numberOfPlanes, airId]
+                };
+                await airPool.query(updateNumberOfPlanesQuery);
+                console.log("Number of planes updated");
+                
                 const numberOfTotalSeats = numSeats.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
                 console.log(numberOfTotalSeats);
                 
@@ -506,6 +517,235 @@ const getAirLocations = async (req, res) => {
 }
 
 
+// Get available air
+const getAvailableAir = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, airCompanyName, date} = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getAvailableAir called from air-service");
+                console.log(req.body);
+                
+                // Get the air id from air company name
+                const airIdQuery = {
+                    text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                    values: [airCompanyName]
+                };
+                const airIdResult = await airPool.query(airIdQuery);
+                const airId = airIdResult.rows[0].air_company_id;
+                console.log("Air id", airId);
+                
+                const dateParts = date.split('-');
+                const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`; // yyyy-mm-dd
+                
+                // Get the unique air id list from schedule info table whose schedule status is 1
+                const scheduleInfoQuery = {
+                    text: 'SELECT unique_air_id FROM air_schedule_info WHERE air_company_id = $1 AND schedule_status = $2 AND schedule_date = $3',
+                    values: [airId, 1, isoDate]
+                };
+                const scheduleInfoResult = await airPool.query(scheduleInfoQuery);
+                const uniqueAirIdList = scheduleInfoResult.rows;
+                console.log(uniqueAirIdList);
+
+                // Get the unique air id array from unique air id list
+                let uniqueAirIdArray = [];
+                for (let i = 0; i < uniqueAirIdList.length; i++) {
+                    uniqueAirIdArray.push(uniqueAirIdList[i].unique_air_id);
+                }
+
+                // Get the unique air id list from air class details table whose unique air id is not in unique air id array
+                const airClassDetailsQuery = {
+                    text: 'SELECT unique_air_id, number_of_seats, class_info FROM air_class_details WHERE air_company_id = $1 AND unique_air_id NOT IN ($2)',
+                    values: [airId, uniqueAirIdArray]
+                };
+
+                const airClassDetailsResult = await airPool.query(airClassDetailsQuery);
+                const uniqueAirIdList1 = airClassDetailsResult.rows;
+                console.log(uniqueAirIdList1);
+                
+                // Get the class names
+                for (let i = 0; i < uniqueAirIdList1.length; i++) {
+                    const classIds = uniqueAirIdList1[i].class_info;
+                    let classNames = [];
+                    for (let j = 0; j < classIds.length; j++) {
+                        const classId = classIds[j];
+                        const classNameQuery = {
+                            text: 'SELECT class_name FROM class_info WHERE class_id = $1',
+                            values: [classId]
+                        };
+                        const classNameResult = await airPool.query(classNameQuery);
+                        const className = classNameResult.rows[0].class_name;
+                        classNames.push(className);
+                    }
+                    uniqueAirIdList1[i].class_names = classNames;
+                }
+
+                let result = {}
+                result.uniqueAirs = uniqueAirIdList1;
+                console.log(result);
+                res.status(200).json(result);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+
+
+// Add air schedule info with air id, source, destination, departure time, fare and date
+const addAirScheduleInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, airCompanyName, src, dest, date, schedule} = req.body;
+
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                // Begin transaction
+                await airPool.query('BEGIN');
+                console.log("addAirScheduleInfo called from air-service");
+                console.log(req.body);
+
+                // Get the air id from air company name
+                const airIdQuery = {
+                    text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                    values: [airCompanyName]
+                };
+                const airIdResult = await airPool.query(airIdQuery);
+                const airId = airIdResult.rows[0].air_company_id;
+                console.log("Air id", airId);
+
+                for (let i = 0; i < schedule.length; i++) {
+                    let scheduleInfo = schedule[i];
+                    console.log(scheduleInfo)
+                    const { time, fare, uniqueFlightId } = scheduleInfo;
+
+                    console.log(time);
+                    console.log(fare);
+                    console.log(uniqueFlightId);
+
+                    const dateParts = date.split('-');
+                    const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`; // yyyy-mm-dd
+
+                    console.log(isoDate);
+
+                    // add air_company_id, unique_air_id, starting_point, ending_point, departure_time, air_fare, schedule_date to air_schedule_info
+                    const airScheduleInfoQuery = {
+                        text: 'INSERT INTO air_schedule_info (air_company_id, unique_air_id, starting_point, ending_point, departure_time, air_fare, schedule_date) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                        values: [airId, uniqueFlightId, src, dest, time, fare, isoDate]
+                    };
+                    await airPool.query(airScheduleInfoQuery);
+                    console.log("Air schedule info added");
+
+                    // Get the air schedule id from air schedule info table
+                    const airScheduleIdQuery = {
+                        text: 'SELECT air_schedule_id FROM air_schedule_info WHERE air_company_id = $1 AND unique_air_id = $2 AND starting_point = $3 AND ending_point = $4 AND departure_time = $5 AND schedule_date = $6 ORDER BY air_schedule_id DESC LIMIT 1',
+                        values: [airId, uniqueFlightId, src, dest, time, isoDate]
+                    };
+                    const airScheduleIdResult = await airPool.query(airScheduleIdQuery);
+                    const airScheduleId = airScheduleIdResult.rows[0].air_schedule_id;
+                    console.log("Air schedule id: ", airScheduleId);
+
+                    // Get class_info from air class details table
+                    const airClassDetailsQuery = {
+                        text: 'SELECT class_info FROM air_class_details WHERE air_company_id = $1 AND unique_air_id = $2',
+                        values: [airId, uniqueFlightId]
+                    };
+                    const airClassDetailsResult = await airPool.query(airClassDetailsQuery);
+                    const classInfo = airClassDetailsResult.rows[0].class_info;
+                    console.log("Class info: ", classInfo);
+
+                    for (let i = 0; i < classInfo.length; i++) {
+                        const classId = classInfo[i];
+    
+                        let queryText = `SELECT air_layout_info.air_layout_id, air_layout_info.number_of_seats, air_layout_info.row, air_layout_info.col
+                                        FROM air_layout_info
+                                        WHERE air_layout_info.air_company_id = $1 AND air_layout_info.class_id = $2`;
+                        let queryValues = [airId, classId];
+    
+                        const query = {
+                            text: queryText,
+                            values: queryValues
+                        };
+                        const result = await airPool.query(query);
+                        
+                        let layoutInfoArray = result.rows;
+    
+                        // if (layoutInfoArray.length === 0) {
+                        //     return res.status(200).json({
+                        //         layout: [],
+                        //     });
+                        // }
+
+                        let layoutInfo = layoutInfoArray[0];
+                        // Get seat details for each layout
+                        let seatQuery = {
+                            text: `SELECT air_seat_details.air_seat_id, air_seat_details.seat_name, air_seat_details.is_seat, air_seat_details.row_id, air_seat_details.col_id
+                            FROM air_seat_details WHERE air_seat_details.air_layout_id = $1`,
+                            values: [layoutInfo.air_layout_id]
+                        };
+    
+                        const seatResult = await airPool.query(seatQuery);
+                        let seatDetails = seatResult.rows;
+
+                        // Add air seat details to air schedule seat details table
+                        for (let j = 0; j < seatDetails.length; j++) {
+                            let seat = seatDetails[j];
+                            if (seat.is_seat) {
+                                const airScheduleSeatDetailsQuery = {
+                                    text: 'INSERT INTO air_schedule_seat_info (air_schedule_id, air_layout_id, air_seat_id) VALUES ($1, $2, $3)',
+                                    values: [airScheduleId, layoutInfo.air_layout_id, seat.air_seat_id]
+                                };
+                                await airPool.query(airScheduleSeatDetailsQuery);
+                            }
+                        }
+                        console.log("Air schedule seat details added");
+                    }
+                    
+                }
+                console.log("Air schedule details added");
+                res.status(200).json({ message: 'Air schedule details added' });
+            } catch (error) {
+                console.log(error);
+                // Rollback transaction
+                await airPool.query('ROLLBACK');
+                res.status(500).json({ message: error.message });
+            } finally {
+                // End transaction
+                await airPool.query('COMMIT');
+            }
+        }
+    });
+
+}
+
 module.exports = {
     getClassInfo,
     addClassInfo,
@@ -514,5 +754,7 @@ module.exports = {
     addAirInfo,
     getAirInfo,
     getAirLocations,
+    getAvailableAir,
+    addAirScheduleInfo,
 }
 
