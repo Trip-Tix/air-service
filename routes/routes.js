@@ -37,4 +37,6 @@ router.post('/api/admin/addAirScheduleInfo', bodyParser, adminAirController.addA
 
 router.post('/api/getLocations', bodyParser, userAirController.getLocation);
 
+router.post('/api/getScheduleWiseAirDetails', bodyParser, userAirController.getScheduleWiseAirDetails);
+
 module.exports = router;

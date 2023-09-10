@@ -12,19 +12,19 @@ const getScheduleWiseAirDetails = async (req, res) => {
     console.log("getScheduleWiseAirDetails called from air-service");
     console.log("req.body: ", req.body);
     const { source, destination, journeyDate } = req.body;
-
-    // Parse journeyDate and returnDate
-    const journeyDateParts = journeyDate.split("-");
-    // const returnDateParts = returnDate.split('-');
-    const isoJourneyDate = `${journeyDateParts[2]}-${journeyDateParts[1]}-${journeyDateParts[0]}`; // yyyy-mm-dd
-    // const isoReturnDate = `${returnDateParts[2]}-${returnDateParts[1]}-${returnDateParts[0]}`; // yyyy-mm-dd
-
     try {
+        // Parse journeyDate and returnDate
+        const journeyDateParts = journeyDate.split("-");
+        // const returnDateParts = returnDate.split('-');
+        const isoJourneyDate = `${journeyDateParts[2]}-${journeyDateParts[1]}-${journeyDateParts[0]}`; // yyyy-mm-dd
+        // const isoReturnDate = `${returnDateParts[2]}-${returnDateParts[1]}-${returnDateParts[0]}`; // yyyy-mm-dd
+
+
         const getAirDetailsQuery = {
-            text: `SELECT unique_air_id, air_id, air_schedule_id, destination_points, departure_time    
+            text: `SELECT unique_air_id, air_company_id, air_schedule_id, departure_time, air_fare    
             FROM air_schedule_info 
             WHERE starting_point = $1 
-            AND $2 = ANY(destination_points) 
+            AND ending_point = $2 
             AND schedule_date = $3 
             AND schedule_status = 1`,
             values: [source, destination, isoJourneyDate],
@@ -38,12 +38,14 @@ const getScheduleWiseAirDetails = async (req, res) => {
             return res.status(200).json([]);
         }
 
+        let responseData = [];
+        let responseObj = {};
+
         for (let i = 0; i < airDetails.length; i++) {
-            const airId = airDetails[i].air_id;
+            const airId = airDetails[i].air_company_id;
             const uniqueAirId = airDetails[i].unique_air_id;
             const airScheduleId = airDetails[i].air_schedule_id;
-            const fare = airDetails[i].air_fare;
-            const destinationPoints = airDetails[i].destination_points;
+            const airFares = airDetails[i].air_fare;
 
             // Change the departure time format to hh:mm AM/PM
             const departureTime = airDetails[i].departure_time;
@@ -66,116 +68,93 @@ const getScheduleWiseAirDetails = async (req, res) => {
 
             airDetails[i].arrival_time = "";
 
-            for (let j = 0; j < destinationPoints.length; j++) {
-                if (destinationPoints[j] === destination) {
-                    airDetails[i].fare = fare[j];
-                    break;
-                }
-            }
-
+            // Get air company name from air_services table
             const getAirCompanyNameQuery = {
-                text: `SELECT air_company_name FROM air_services WHERE air_id = $1`,
+                text: `SELECT air_company_name FROM air_services WHERE air_company_id = $1`,
                 values: [airId],
             };
             const getAirCompanyNameResult = await airPool.query(
                 getAirCompanyNameQuery
             );
             const airCompanyName = getAirCompanyNameResult.rows[0].air_company_name;
-            airDetails[i].air_company_name = airCompanyName;
 
+            // Get the class info from air_coach info table
             const getCoachInfoQuery = {
-                text: `SELECT air_coach_details.coach_id, air_coach_details.brand_name_id, 
-                coach_info.coach_name, air_coach_info.air_coach_id, brand_name_info.brand_name  
-                FROM air_coach_details 
-                INNER JOIN coach_info ON air_coach_details.coach_id = coach_info.coach_id 
-                INNER JOIN brand_name_info ON air_coach_details.brand_name_id = brand_name_info.brand_name_id 
-                INNER JOIN air_coach_info ON air_coach_details.coach_id = air_coach_info.coach_id 
-                AND air_coach_details.air_id = air_coach_info.air_id 
-                WHERE air_coach_details.air_id = $1 
-                AND air_coach_details.unique_air_id = $2`,
-                values: [airId, uniqueAirId],
+                text: `SELECT class_info, facilities FROM air_class_details 
+                WHERE unique_air_id = $1`,
+                values: [uniqueAirId],
             };
             const getCoachInfoResult = await airPool.query(getCoachInfoQuery);
-            const coachInfo = getCoachInfoResult.rows[0];
-            const coachId = coachInfo.coach_id;
-            const brandNameId = coachInfo.brand_name_id;
-            const coachName = coachInfo.coach_name;
-            const airCoachId = coachInfo.air_coach_id;
-            const brandName = coachInfo.brand_name;
+            const facilities = getCoachInfoResult.rows[0].facilities;
+            const classInfo = getCoachInfoResult.rows[0].class_info;
 
-            airDetails[i].coach_id = coachId;
-            airDetails[i].brand_name = brandName;
-            airDetails[i].coach_name = coachName;
+            for (let j = 0; j < classInfo.length; j++) {
+                responseObj = {};
+                const classId = classInfo[j];
 
-            const getAvailableSeatCountQuery = {
-                text: `SELECT COUNT(*) 
-                FROM air_schedule_seat_info
-                WHERE air_schedule_id = $1
-                AND booked_status = 0`,
-                values: [airScheduleId],
-            };
-            const getAvailableSeatCountResult = await airPool.query(
-                getAvailableSeatCountQuery
-            );
-            const availableSeatCount = getAvailableSeatCountResult.rows[0].count;
-            airDetails[i].available_seat_count = availableSeatCount;
+                // Get the class name from class_info table and fare from air fare table
+                const getCoachNameQuery = {
+                    text: `SELECT class_name FROM class_info WHERE class_id = $1`,
+                    values: [classId],
+                };
+                const getCoachNameResult = await airPool.query(getCoachNameQuery);
+                const className = getCoachNameResult.rows[0].class_name;
 
-            // Get air layout
-            const getAirLayoutQuery = {
-                text: `SELECT air_layout_id, number_of_seats, row, col 
-                FROM air_layout_info
-                WHERE air_coach_id = $1 
-                AND air_id = $2`,
-                values: [airCoachId, airId],
-            };
-            const getAirLayoutResult = await airPool.query(getAirLayoutQuery);
-            const airLayout = getAirLayoutResult.rows[0];
-            const airLayoutId = airLayout.air_layout_id;
-            const numberOfSeats = airLayout.number_of_seats;
-            const row = airLayout.row;
-            const col = airLayout.col;
-            airDetails[i].air_layout_id = airLayoutId;
-            airDetails[i].number_of_seats = numberOfSeats;
+                const airFare = airFares[j];
 
-            const getSeatDetailsQuery = {
-                text: `SELECT air_seat_id, seat_name, is_seat, row_id, col_id 
-                FROM air_seat_details
-                WHERE air_layout_id = $1`,
-                values: [airLayoutId],
-            };
-            const getSeatDetailsResult = await airPool.query(getSeatDetailsQuery);
-            const seatDetails = getSeatDetailsResult.rows;
+                // Get the air layout id
+                const getAirLayoutIdQuery = {
+                    text: `SELECT air_layout_id, number_of_seats, row, col
+                    FROM air_layout_info
+                    WHERE class_id = $1
+                    AND air_company_id = $2`,
+                    values: [classId, airId],
+                };
+                const getAirLayoutIdResult = await airPool.query(
+                    getAirLayoutIdQuery
+                );
+                const airLayoutId = getAirLayoutIdResult.rows[0].air_layout_id;
+                const numberOfSeats = getAirLayoutIdResult.rows[0].number_of_seats;
+                const row = getAirLayoutIdResult.rows[0].row;
+                const col = getAirLayoutIdResult.rows[0].col;
 
-            let layout = [];
-            for (let j = 0; j < row; j++) {
-                layout.push(new Array(col).fill(0));
+                // Get available seat count query
+                const getAvailableSeatCountQuery = {
+                    text: `SELECT COUNT(*)
+                    FROM air_schedule_seat_info
+                    WHERE air_schedule_id = $1
+                    AND air_layout_id = $2
+                    AND booked_status = 0`,
+                    values: [airScheduleId, airLayoutId],
+                };
+                const getAvailableSeatCountResult = await airPool.query(
+                    getAvailableSeatCountQuery
+                );
+                const availableSeatCount = getAvailableSeatCountResult.rows[0].count;
+
+                responseObj.class_name = className;
+                responseObj.air_fare = airFare;
+                responseObj.air_company_name = airCompanyName;
+                responseObj.brand_name = "";
+                responseObj.unique_air_id = uniqueAirId;
+                responseObj.air_schedule_id = airScheduleId;
+                responseObj.departure_time = departureTimeFormatted;
+                responseObj.facilities = facilities;
+                responseObj.air_company_id = airId;
+                responseObj.number_of_seats = numberOfSeats;
+                responseObj.available_seat_count = availableSeatCount;
+
+                responseData.push(responseObj);
+                
+                // console.log(responseObj);
             }
 
-            let seatName = [];
-            for (let j = 0; j < row; j++) {
-                seatName.push(new Array(col).fill(""));
-            }
-
-            for (let j = 0; j < seatDetails.length; j++) {
-                let seat = seatDetails[j];
-                console.log("seat: ", seat);
-                if (seat.is_seat) {
-                    layout[seat.row_id][seat.col_id] = 1;
-                    seatName[seat.row_id][seat.col_id] = seat.seat_name;
-                }
-            }
-
-            airDetails[i].layout = layout;
-            airDetails[i].seat_name = seatName;
-
-            // Remove unnecessary fields
-            delete airDetails[i].air_fare;
-            delete airDetails[i].destination_points;
+            
         }
 
-        console.log("airDetails: ", airDetails);
+        // console.log("airDetails: ", responseData);
 
-        return res.status(200).json(airDetails);
+        return res.status(200).json(responseData);
     } catch (error) {
         console.log("error: ", error);
         return res.status(500).json(error);
@@ -200,15 +179,15 @@ const getUniqueAirDetails = async (req, res) => {
             return res.status(500).json({ message: "Failed to authenticate token" });
         }
 
-        // Get the air coach id
+        // Get the air class id
         const getAirCoachIdQuery = {
-            text: `SELECT air_coach_info.air_coach_id, air_coach_details.coach_id, air_coach_details.brand_name_id 
+            text: `SELECT air_coach_info.air_coach_id, air_coach_details.class_id, air_coach_details.brand_name_id 
             FROM air_coach_info
-            INNER JOIN air_coach_details ON air_coach_info.coach_id = air_coach_details.coach_id 
-            AND air_coach_info.air_id = air_coach_details.air_id 
+            INNER JOIN air_coach_details ON air_coach_info.class_id = air_coach_details.class_id 
+            AND air_coach_info.air_company_id = air_coach_details.air_company_id 
             AND air_coach_info.brand_name_id = air_coach_details.brand_name_id
             WHERE air_coach_details.unique_air_id = $1
-            AND air_coach_details.air_id = $2`,
+            AND air_coach_details.air_company_id = $2`,
             values: [uniqueAirId, airId],
         };
         const getAirCoachIdResult = await airPool.query(getAirCoachIdQuery);
@@ -220,7 +199,7 @@ const getUniqueAirDetails = async (req, res) => {
             text: `SELECT air_layout_id, number_of_seats, row, col
             FROM air_layout_info
             WHERE air_coach_id = $1
-            AND air_id = $2`,
+            AND air_company_id = $2`,
             values: [airCoachId, airId],
         };
         const getAirLayoutIdResult = await airPool.query(getAirLayoutIdQuery);
@@ -607,7 +586,7 @@ const getLocation = async (req, res) => {
     try {
         console.log("getDistricts called from air-service");
         const query = {
-            text: "SELECT location_id, location_name FROM location_info",
+            text: "SELECT location_id, station_name AS location_name FROM location_info",
         };
         const result = await airPool.query(query);
         const districts = result.rows;
