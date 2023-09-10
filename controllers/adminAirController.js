@@ -396,7 +396,7 @@ const getAirInfo = async (req, res) => {
                 text: 'SELECT unique_air_id, class_info, facilities, number_of_seats, status FROM air_class_details WHERE air_company_id = $1',
                 values: [airId]
             };
-            
+
             const uniqueAirIdResult = await airPool.query(uniqueAirIdQuery);
             const uniqueAirIdList = uniqueAirIdResult.rows;
 
@@ -747,6 +747,63 @@ const addAirScheduleInfo = async (req, res) => {
 
 }
 
+
+
+
+// Add air info
+const updateAirStatus = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const { token, airCompanyName, unique_flight_id, status } = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                // Begin transaction
+                await airPool.query('BEGIN');
+                
+                // get air_company_id from air_services
+                const airIdQuery = {
+                    text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                    values: [airCompanyName]
+                };
+                const airIdResult = await airPool.query(airIdQuery);
+                const airId = airIdResult.rows[0].air_company_id;
+                console.log("Air id", airId);
+
+                console.log(status, " ", airId, " ", unique_flight_id);
+
+                // update status in air_class_details based on air_company_id and unique_air_id
+                const updateStatusQuery = {
+                    text: 'UPDATE air_class_details SET status = $1 WHERE air_company_id = $2 AND unique_air_id = $3',
+                    values: [status, airId, unique_flight_id]
+                };
+                await airPool.query(updateStatusQuery);
+
+                console.log("Air Status Updated");
+                res.status(200).json({ message: 'Air Status Updated' });
+            } catch (error) {
+                // Rollback transaction
+                await airPool.query('ROLLBACK');
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            } finally {
+                // End transaction
+                await airPool.query('COMMIT');
+            }
+        }
+    });
+}
+
 module.exports = {
     getClassInfo,
     addClassInfo,
@@ -757,5 +814,6 @@ module.exports = {
     getAirLocations,
     getAvailableAir,
     addAirScheduleInfo,
+    updateAirStatus,
 }
 
