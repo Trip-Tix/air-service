@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser').json();
 const adminAirController = require('../controllers/adminAirController');
-const userTrainController = require('../controllers/userAirController');
+const userAirController = require('../controllers/userAirController');
 
 
 const router = express.Router();
@@ -35,6 +35,6 @@ router.post('/api/admin/getAvailableAir', bodyParser, adminAirController.getAvai
 // Add air schedule info from admin
 router.post('/api/admin/addAirScheduleInfo', bodyParser, adminAirController.addAirScheduleInfo);
 
-router.post('/api/getLocations', bodyParser, userTrainController.getLocation);
+router.post('/api/getLocations', bodyParser, userAirController.getLocation);
 
 module.exports = router;
