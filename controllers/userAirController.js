@@ -1,15 +1,15 @@
 const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
-const trainPool = require("../config/trainDB.js");
+const airPool = require("../config/airDB.js");
 const accountPool = require("../config/accountDB.js");
 
 dotenv.config();
 
 const secretKey = process.env.SECRETKEY;
 
-// Get all train from source, destination and date
-const getScheduleWiseTrainDetails = async (req, res) => {
-    console.log("getScheduleWiseTrainDetails called from train-service");
+// Get all air from source, destination and date
+const getScheduleWiseAirDetails = async (req, res) => {
+    console.log("getScheduleWiseAirDetails called from air-service");
     console.log("req.body: ", req.body);
     const { source, destination, journeyDate } = req.body;
 
@@ -20,9 +20,9 @@ const getScheduleWiseTrainDetails = async (req, res) => {
     // const isoReturnDate = `${returnDateParts[2]}-${returnDateParts[1]}-${returnDateParts[0]}`; // yyyy-mm-dd
 
     try {
-        const getTrainDetailsQuery = {
-            text: `SELECT unique_train_id, train_id, train_schedule_id, destination_points, departure_time    
-            FROM train_schedule_info 
+        const getAirDetailsQuery = {
+            text: `SELECT unique_air_id, air_id, air_schedule_id, destination_points, departure_time    
+            FROM air_schedule_info 
             WHERE starting_point = $1 
             AND $2 = ANY(destination_points) 
             AND schedule_date = $3 
@@ -30,23 +30,23 @@ const getScheduleWiseTrainDetails = async (req, res) => {
             values: [source, destination, isoJourneyDate],
         };
 
-        const getTrainDetailsResult = await trainPool.query(getTrainDetailsQuery);
-        const trainDetails = getTrainDetailsResult.rows;
-        console.log("trainDetails: ", trainDetails);
+        const getAirDetailsResult = await airPool.query(getAirDetailsQuery);
+        const airDetails = getAirDetailsResult.rows;
+        console.log("airDetails: ", airDetails);
 
-        if (trainDetails.length === 0) {
+        if (airDetails.length === 0) {
             return res.status(200).json([]);
         }
 
-        for (let i = 0; i < trainDetails.length; i++) {
-            const trainId = trainDetails[i].train_id;
-            const uniqueTrainId = trainDetails[i].unique_train_id;
-            const trainScheduleId = trainDetails[i].train_schedule_id;
-            const fare = trainDetails[i].train_fare;
-            const destinationPoints = trainDetails[i].destination_points;
+        for (let i = 0; i < airDetails.length; i++) {
+            const airId = airDetails[i].air_id;
+            const uniqueAirId = airDetails[i].unique_air_id;
+            const airScheduleId = airDetails[i].air_schedule_id;
+            const fare = airDetails[i].air_fare;
+            const destinationPoints = airDetails[i].destination_points;
 
             // Change the departure time format to hh:mm AM/PM
-            const departureTime = trainDetails[i].departure_time;
+            const departureTime = airDetails[i].departure_time;
             const departureTimeParts = departureTime.split(":");
             let hour = parseInt(departureTimeParts[0]);
             let minute = departureTimeParts[1];
@@ -62,88 +62,88 @@ const getScheduleWiseTrainDetails = async (req, res) => {
                 hour = 12;
             }
             const departureTimeFormatted = `${hour}:${minute} ${ampm}`;
-            trainDetails[i].departure_time = departureTimeFormatted;
+            airDetails[i].departure_time = departureTimeFormatted;
 
-            trainDetails[i].arrival_time = "";
+            airDetails[i].arrival_time = "";
 
             for (let j = 0; j < destinationPoints.length; j++) {
                 if (destinationPoints[j] === destination) {
-                    trainDetails[i].fare = fare[j];
+                    airDetails[i].fare = fare[j];
                     break;
                 }
             }
 
-            const getTrainCompanyNameQuery = {
-                text: `SELECT train_company_name FROM train_services WHERE train_id = $1`,
-                values: [trainId],
+            const getAirCompanyNameQuery = {
+                text: `SELECT air_company_name FROM air_services WHERE air_id = $1`,
+                values: [airId],
             };
-            const getTrainCompanyNameResult = await trainPool.query(
-                getTrainCompanyNameQuery
+            const getAirCompanyNameResult = await airPool.query(
+                getAirCompanyNameQuery
             );
-            const trainCompanyName = getTrainCompanyNameResult.rows[0].train_company_name;
-            trainDetails[i].train_company_name = trainCompanyName;
+            const airCompanyName = getAirCompanyNameResult.rows[0].air_company_name;
+            airDetails[i].air_company_name = airCompanyName;
 
             const getCoachInfoQuery = {
-                text: `SELECT train_coach_details.coach_id, train_coach_details.brand_name_id, 
-                coach_info.coach_name, train_coach_info.train_coach_id, brand_name_info.brand_name  
-                FROM train_coach_details 
-                INNER JOIN coach_info ON train_coach_details.coach_id = coach_info.coach_id 
-                INNER JOIN brand_name_info ON train_coach_details.brand_name_id = brand_name_info.brand_name_id 
-                INNER JOIN train_coach_info ON train_coach_details.coach_id = train_coach_info.coach_id 
-                AND train_coach_details.train_id = train_coach_info.train_id 
-                WHERE train_coach_details.train_id = $1 
-                AND train_coach_details.unique_train_id = $2`,
-                values: [trainId, uniqueTrainId],
+                text: `SELECT air_coach_details.coach_id, air_coach_details.brand_name_id, 
+                coach_info.coach_name, air_coach_info.air_coach_id, brand_name_info.brand_name  
+                FROM air_coach_details 
+                INNER JOIN coach_info ON air_coach_details.coach_id = coach_info.coach_id 
+                INNER JOIN brand_name_info ON air_coach_details.brand_name_id = brand_name_info.brand_name_id 
+                INNER JOIN air_coach_info ON air_coach_details.coach_id = air_coach_info.coach_id 
+                AND air_coach_details.air_id = air_coach_info.air_id 
+                WHERE air_coach_details.air_id = $1 
+                AND air_coach_details.unique_air_id = $2`,
+                values: [airId, uniqueAirId],
             };
-            const getCoachInfoResult = await trainPool.query(getCoachInfoQuery);
+            const getCoachInfoResult = await airPool.query(getCoachInfoQuery);
             const coachInfo = getCoachInfoResult.rows[0];
             const coachId = coachInfo.coach_id;
             const brandNameId = coachInfo.brand_name_id;
             const coachName = coachInfo.coach_name;
-            const trainCoachId = coachInfo.train_coach_id;
+            const airCoachId = coachInfo.air_coach_id;
             const brandName = coachInfo.brand_name;
 
-            trainDetails[i].coach_id = coachId;
-            trainDetails[i].brand_name = brandName;
-            trainDetails[i].coach_name = coachName;
+            airDetails[i].coach_id = coachId;
+            airDetails[i].brand_name = brandName;
+            airDetails[i].coach_name = coachName;
 
             const getAvailableSeatCountQuery = {
                 text: `SELECT COUNT(*) 
-                FROM train_schedule_seat_info
-                WHERE train_schedule_id = $1
+                FROM air_schedule_seat_info
+                WHERE air_schedule_id = $1
                 AND booked_status = 0`,
-                values: [trainScheduleId],
+                values: [airScheduleId],
             };
-            const getAvailableSeatCountResult = await trainPool.query(
+            const getAvailableSeatCountResult = await airPool.query(
                 getAvailableSeatCountQuery
             );
             const availableSeatCount = getAvailableSeatCountResult.rows[0].count;
-            trainDetails[i].available_seat_count = availableSeatCount;
+            airDetails[i].available_seat_count = availableSeatCount;
 
-            // Get train layout
-            const getTrainLayoutQuery = {
-                text: `SELECT train_layout_id, number_of_seats, row, col 
-                FROM train_layout_info
-                WHERE train_coach_id = $1 
-                AND train_id = $2`,
-                values: [trainCoachId, trainId],
+            // Get air layout
+            const getAirLayoutQuery = {
+                text: `SELECT air_layout_id, number_of_seats, row, col 
+                FROM air_layout_info
+                WHERE air_coach_id = $1 
+                AND air_id = $2`,
+                values: [airCoachId, airId],
             };
-            const getTrainLayoutResult = await trainPool.query(getTrainLayoutQuery);
-            const trainLayout = getTrainLayoutResult.rows[0];
-            const trainLayoutId = trainLayout.train_layout_id;
-            const numberOfSeats = trainLayout.number_of_seats;
-            const row = trainLayout.row;
-            const col = trainLayout.col;
-            trainDetails[i].train_layout_id = trainLayoutId;
-            trainDetails[i].number_of_seats = numberOfSeats;
+            const getAirLayoutResult = await airPool.query(getAirLayoutQuery);
+            const airLayout = getAirLayoutResult.rows[0];
+            const airLayoutId = airLayout.air_layout_id;
+            const numberOfSeats = airLayout.number_of_seats;
+            const row = airLayout.row;
+            const col = airLayout.col;
+            airDetails[i].air_layout_id = airLayoutId;
+            airDetails[i].number_of_seats = numberOfSeats;
 
             const getSeatDetailsQuery = {
-                text: `SELECT train_seat_id, seat_name, is_seat, row_id, col_id 
-                FROM train_seat_details
-                WHERE train_layout_id = $1`,
-                values: [trainLayoutId],
+                text: `SELECT air_seat_id, seat_name, is_seat, row_id, col_id 
+                FROM air_seat_details
+                WHERE air_layout_id = $1`,
+                values: [airLayoutId],
             };
-            const getSeatDetailsResult = await trainPool.query(getSeatDetailsQuery);
+            const getSeatDetailsResult = await airPool.query(getSeatDetailsQuery);
             const seatDetails = getSeatDetailsResult.rows;
 
             let layout = [];
@@ -165,29 +165,29 @@ const getScheduleWiseTrainDetails = async (req, res) => {
                 }
             }
 
-            trainDetails[i].layout = layout;
-            trainDetails[i].seat_name = seatName;
+            airDetails[i].layout = layout;
+            airDetails[i].seat_name = seatName;
 
             // Remove unnecessary fields
-            delete trainDetails[i].train_fare;
-            delete trainDetails[i].destination_points;
+            delete airDetails[i].air_fare;
+            delete airDetails[i].destination_points;
         }
 
-        console.log("trainDetails: ", trainDetails);
+        console.log("airDetails: ", airDetails);
 
-        return res.status(200).json(trainDetails);
+        return res.status(200).json(airDetails);
     } catch (error) {
         console.log("error: ", error);
         return res.status(500).json(error);
     }
 };
 
-// Get unique train details
-const getUniqueTrainDetails = async (req, res) => {
-    console.log("getUniqueTrainDetails called from train-service");
+// Get unique air details
+const getUniqueAirDetails = async (req, res) => {
+    console.log("getUniqueAirDetails called from air-service");
 
     // Get the token
-    const { token, uniqueTrainId, trainId, trainScheduleId } = req.body;
+    const { token, uniqueAirId, airId, airScheduleId } = req.body;
     if (!token) {
         console.log("No token provided");
         return res.status(401).json({ message: "No token provided" });
@@ -200,56 +200,56 @@ const getUniqueTrainDetails = async (req, res) => {
             return res.status(500).json({ message: "Failed to authenticate token" });
         }
 
-        // Get the train coach id
-        const getTrainCoachIdQuery = {
-            text: `SELECT train_coach_info.train_coach_id, train_coach_details.coach_id, train_coach_details.brand_name_id 
-            FROM train_coach_info
-            INNER JOIN train_coach_details ON train_coach_info.coach_id = train_coach_details.coach_id 
-            AND train_coach_info.train_id = train_coach_details.train_id 
-            AND train_coach_info.brand_name_id = train_coach_details.brand_name_id
-            WHERE train_coach_details.unique_train_id = $1
-            AND train_coach_details.train_id = $2`,
-            values: [uniqueTrainId, trainId],
+        // Get the air coach id
+        const getAirCoachIdQuery = {
+            text: `SELECT air_coach_info.air_coach_id, air_coach_details.coach_id, air_coach_details.brand_name_id 
+            FROM air_coach_info
+            INNER JOIN air_coach_details ON air_coach_info.coach_id = air_coach_details.coach_id 
+            AND air_coach_info.air_id = air_coach_details.air_id 
+            AND air_coach_info.brand_name_id = air_coach_details.brand_name_id
+            WHERE air_coach_details.unique_air_id = $1
+            AND air_coach_details.air_id = $2`,
+            values: [uniqueAirId, airId],
         };
-        const getTrainCoachIdResult = await trainPool.query(getTrainCoachIdQuery);
-        const trainCoachId = getTrainCoachIdResult.rows[0].train_coach_id;
-        console.log("trainCoachId: ", trainCoachId);
+        const getAirCoachIdResult = await airPool.query(getAirCoachIdQuery);
+        const airCoachId = getAirCoachIdResult.rows[0].air_coach_id;
+        console.log("airCoachId: ", airCoachId);
 
-        // Get the train layout id
-        const getTrainLayoutIdQuery = {
-            text: `SELECT train_layout_id, number_of_seats, row, col
-            FROM train_layout_info
-            WHERE train_coach_id = $1
-            AND train_id = $2`,
-            values: [trainCoachId, trainId],
+        // Get the air layout id
+        const getAirLayoutIdQuery = {
+            text: `SELECT air_layout_id, number_of_seats, row, col
+            FROM air_layout_info
+            WHERE air_coach_id = $1
+            AND air_id = $2`,
+            values: [airCoachId, airId],
         };
-        const getTrainLayoutIdResult = await trainPool.query(getTrainLayoutIdQuery);
-        const trainLayoutId = getTrainLayoutIdResult.rows[0].train_layout_id;
-        const numberOfSeats = getTrainLayoutIdResult.rows[0].number_of_seats;
-        const row = getTrainLayoutIdResult.rows[0].row;
-        const col = getTrainLayoutIdResult.rows[0].col;
+        const getAirLayoutIdResult = await airPool.query(getAirLayoutIdQuery);
+        const airLayoutId = getAirLayoutIdResult.rows[0].air_layout_id;
+        const numberOfSeats = getAirLayoutIdResult.rows[0].number_of_seats;
+        const row = getAirLayoutIdResult.rows[0].row;
+        const col = getAirLayoutIdResult.rows[0].col;
         let availableSeatCount = numberOfSeats;
-        console.log("trainLayoutId: ", trainLayoutId);
+        console.log("airLayoutId: ", airLayoutId);
 
         // Get the seat details
         const getSeatDetailsQuery = {
-            text: `SELECT train_seat_id, seat_name, is_seat, row_id, col_id
-            FROM train_seat_details
-            WHERE train_layout_id = $1`,
-            values: [trainLayoutId],
+            text: `SELECT air_seat_id, seat_name, is_seat, row_id, col_id
+            FROM air_seat_details
+            WHERE air_layout_id = $1`,
+            values: [airLayoutId],
         };
-        const getSeatDetailsResult = await trainPool.query(getSeatDetailsQuery);
+        const getSeatDetailsResult = await airPool.query(getSeatDetailsQuery);
         const seatDetails = getSeatDetailsResult.rows;
 
         // Get the schedule seat details
         const getScheduleSeatDetailsQuery = {
-            text: `SELECT train_schedule_seat_id, train_seat_id, booked_status, passenger_id 
-            FROM train_schedule_seat_info
-            WHERE train_schedule_id = $1 
-            AND train_layout_id = $2`,
-            values: [trainScheduleId, trainLayoutId],
+            text: `SELECT air_schedule_seat_id, air_seat_id, booked_status, passenger_id 
+            FROM air_schedule_seat_info
+            WHERE air_schedule_id = $1 
+            AND air_layout_id = $2`,
+            values: [airScheduleId, airLayoutId],
         };
-        const getScheduleSeatDetailsResult = await trainPool.query(
+        const getScheduleSeatDetailsResult = await airPool.query(
             getScheduleSeatDetailsQuery
         );
         const scheduleSeatDetails = getScheduleSeatDetailsResult.rows;
@@ -264,9 +264,9 @@ const getUniqueTrainDetails = async (req, res) => {
             seatName.push(new Array(col).fill(""));
         }
 
-        let trainSeatId = [];
+        let airSeatId = [];
         for (let i = 0; i < row; i++) {
-            trainSeatId.push(new Array(col).fill(-1));
+            airSeatId.push(new Array(col).fill(-1));
         }
 
         for (let i = 0; i < seatDetails.length; i++) {
@@ -275,7 +275,7 @@ const getUniqueTrainDetails = async (req, res) => {
             if (seat.is_seat) {
                 layout[seat.row_id][seat.col_id] = 1;
                 seatName[seat.row_id][seat.col_id] = seat.seat_name;
-                trainSeatId[seat.row_id][seat.col_id] = seat.train_seat_id;
+                airSeatId[seat.row_id][seat.col_id] = seat.air_seat_id;
             }
         }
 
@@ -284,9 +284,9 @@ const getUniqueTrainDetails = async (req, res) => {
             if (seat.booked_status === 1) {
                 // Temporary Booked
                 availableSeatCount--;
-                let seatId = seat.train_seat_id;
+                let seatId = seat.air_seat_id;
                 for (let j = 0; j < seatDetails.length; j++) {
-                    if (seatId === seatDetails[j].train_seat_id) {
+                    if (seatId === seatDetails[j].air_seat_id) {
                         if (seat.passenger_gender === "M") {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 4;
                         } else {
@@ -298,9 +298,9 @@ const getUniqueTrainDetails = async (req, res) => {
             } else if (seat.booked_status === 2) {
                 // Permanent Booked
                 availableSeatCount--;
-                let seatId = seat.train_seat_id;
+                let seatId = seat.air_seat_id;
                 for (let j = 0; j < seatDetails.length; j++) {
-                    if (seatId === seatDetails[j].train_seat_id) {
+                    if (seatId === seatDetails[j].air_seat_id) {
                         if (seat.passenger_gender === "M") {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 2;
                         } else {
@@ -317,7 +317,7 @@ const getUniqueTrainDetails = async (req, res) => {
 
         return res
             .status(200)
-            .json({ layout, seatName, trainSeatId, numberOfSeats, availableSeatCount });
+            .json({ layout, seatName, airSeatId, numberOfSeats, availableSeatCount });
     });
 };
 
@@ -340,9 +340,9 @@ const tempBookSeat = async (req, res) => {
         }
 
         try {
-            console.log("Temporary book seat called from train-service");
+            console.log("Temporary book seat called from air-service");
             // Begin transaction
-            await trainPool.query("BEGIN");
+            await airPool.query("BEGIN");
             await accountPool.query("BEGIN");
 
             // Get the current date and time
@@ -370,7 +370,7 @@ const tempBookSeat = async (req, res) => {
 
             for (let i = 0; i < ticketInfo.length; i++) {
                 const ticket = ticketInfo[i];
-                const { trainScheduleId, passengerInfo, source, destination } = ticket;
+                const { airScheduleId, passengerInfo, source, destination } = ticket;
                 const ticketId = Math.random().toString().substring(2, 17);
 
                 // Get source and destination name from location_info table
@@ -378,14 +378,14 @@ const tempBookSeat = async (req, res) => {
                     text: `SELECT location_name FROM location_info WHERE location_id = $1`,
                     values: [source],
                 };
-                const getSourceNameResult = await trainPool.query(getSourceNameQuery);
+                const getSourceNameResult = await airPool.query(getSourceNameQuery);
                 const sourceName = getSourceNameResult.rows[0].location_name;
 
                 const getDestinationNameQuery = {
                     text: `SELECT location_name FROM location_info WHERE location_id = $1`,
                     values: [destination],
                 };
-                const getDestinationNameResult = await trainPool.query(
+                const getDestinationNameResult = await airPool.query(
                     getDestinationNameQuery
                 );
                 const destinationName = getDestinationNameResult.rows[0].location_name;
@@ -394,15 +394,15 @@ const tempBookSeat = async (req, res) => {
 
                 // Generate unique ticket ID of 15 characters length with numbers only
 
-                // Get the train ticket fare 
-                const getTrainTicketFareQuery = {
-                    text: `SELECT train_fare FROM train_schedule_info WHERE train_schedule_id = $1`,
-                    values: [trainScheduleId],
+                // Get the air ticket fare 
+                const getAirTicketFareQuery = {
+                    text: `SELECT air_fare FROM air_schedule_info WHERE air_schedule_id = $1`,
+                    values: [airScheduleId],
                 };
-                const getTrainTicketFareResult = await trainPool.query(
-                    getTrainTicketFareQuery
+                const getAirTicketFareResult = await airPool.query(
+                    getAirTicketFareQuery
                 );
-                const trainTicketFare = parseInt(getTrainTicketFareResult.rows[0].train_fare);
+                const airTicketFare = parseInt(getAirTicketFareResult.rows[0].air_fare);
 
                 let perValidTicketFare = 0;
                 let perTempTicketFare = 0;
@@ -410,14 +410,14 @@ const tempBookSeat = async (req, res) => {
 
                 let passengerIdArray = [];
 
-                let temporaryTrainSeatIdArray = [];
+                let temporaryAirSeatIdArray = [];
                 let temporaryPassengerIdArray = [];
 
 
                 for (let i = 0; i < passengerInfo.length; i++) {
                     const passenger = passengerInfo[i];
                     const {
-                        trainSeatId,
+                        airSeatId,
                         passengerName,
                         passengerGender,
                         passengerMobile,
@@ -498,30 +498,30 @@ const tempBookSeat = async (req, res) => {
 
                     if (isTemp) {
                         isInvalidTicketPresent = true;
-                        perTempTicketFare += trainTicketFare;
-                        temporaryTrainSeatIdArray.push(trainSeatId);
+                        perTempTicketFare += airTicketFare;
+                        temporaryAirSeatIdArray.push(airSeatId);
                         temporaryPassengerIdArray.push(passengerId);
                         temporaryNumberOfTickets++;
                     } else {
                         isValidTicketPresent = true;
                         // Temporary booking ticket
-                        perValidTicketFare += trainTicketFare;
+                        perValidTicketFare += airTicketFare;
                         passengerIdArray.push(passengerId);
                         const tempBookSeatQuery = {
-                            text: `UPDATE train_schedule_seat_info
+                            text: `UPDATE air_schedule_seat_info
                         SET booked_status = 1, passenger_id = $1, passenger_gender = $2, booking_time = $3, ticket_id = $4  
-                        WHERE train_schedule_id = $5
-                        AND train_seat_id = $6`,
+                        WHERE air_schedule_id = $5
+                        AND air_seat_id = $6`,
                             values: [
                                 passengerId,
                                 passengerGender,
                                 bookingTimestamp,
                                 ticketId,
-                                trainScheduleId,
-                                trainSeatId,
+                                airScheduleId,
+                                airSeatId,
                             ],
                         };
-                        await trainPool.query(tempBookSeatQuery);
+                        await airPool.query(tempBookSeatQuery);
                         console.log("Seat temporarily booked successfully");
                     }
                 }
@@ -529,17 +529,17 @@ const tempBookSeat = async (req, res) => {
                 if (isValidTicketPresent) {
                     const numTickets = passengerIdArray.length;
                     const insertIntoTicketInfoQuery = {
-                        text: `INSERT INTO ticket_info (ticket_id, user_id, train_schedule_id, 
+                        text: `INSERT INTO ticket_info (ticket_id, user_id, air_schedule_id, 
                             number_of_tickets, total_fare, passenger_info, date, source, destination) 
                             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                        values: [ticketId, userId, trainScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, sourceName, destinationName]
+                        values: [ticketId, userId, airScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, sourceName, destinationName]
                     }
-                    await trainPool.query(insertIntoTicketInfoQuery);
+                    await airPool.query(insertIntoTicketInfoQuery);
                     console.log("Temporary Ticket added successfully");
                     responseData.push({
                         ticketId,
                         passengerIdArray,
-                        trainScheduleId,
+                        airScheduleId,
                         totalFare: perValidTicketFare,
                         numberOfTickets: numTickets,
                     });
@@ -550,27 +550,27 @@ const tempBookSeat = async (req, res) => {
                     const queueTicketId = Math.random().toString().substring(2, 17);
                     const insertIntoTicketQueueQuery = {
                         text: `INSERT INTO ticket_queue 
-                        (queue_ticket_id, user_id, total_fare, train_schedule_id, number_of_tickets, passenger_info, train_seat_id, date, source, destination)
+                        (queue_ticket_id, user_id, total_fare, air_schedule_id, number_of_tickets, passenger_info, air_seat_id, date, source, destination)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
                         values: [
                             queueTicketId,
                             userId,
                             perTempTicketFare,
-                            trainScheduleId,
+                            airScheduleId,
                             temporaryNumberOfTickets,
                             temporaryPassengerIdArray,
-                            temporaryTrainSeatIdArray,
+                            temporaryAirSeatIdArray,
                             currentDate,
                             sourceName,
                             destinationName,
                         ],
                     };
-                    await trainPool.query(insertIntoTicketQueueQuery);
+                    await airPool.query(insertIntoTicketQueueQuery);
                     console.log("Ticket added to queue successfully");
                     tempResponseData.push({
                         ticketId: queueTicketId,
                         passengerIdArray: temporaryPassengerIdArray,
-                        trainScheduleId,
+                        airScheduleId,
                         totalFare: perTempTicketFare,
                         numberOfTickets: temporaryNumberOfTickets,
                     });
@@ -590,13 +590,13 @@ const tempBookSeat = async (req, res) => {
             res.status(200).json(responseObj);
         } catch (error) {
             // Rollback transaction
-            await trainPool.query("ROLLBACK");
+            await airPool.query("ROLLBACK");
             await accountPool.query("ROLLBACK");
             console.log("error here: ", error);
             res.status(500).json(error);
         } finally {
             // Commit transaction
-            await trainPool.query("COMMIT");
+            await airPool.query("COMMIT");
             await accountPool.query("COMMIT");
         }
     });
@@ -605,11 +605,11 @@ const tempBookSeat = async (req, res) => {
 // Get districts
 const getLocation = async (req, res) => {
     try {
-        console.log("getDistricts called from train-service");
+        console.log("getDistricts called from air-service");
         const query = {
             text: "SELECT location_id, location_name FROM location_info",
         };
-        const result = await trainPool.query(query);
+        const result = await airPool.query(query);
         const districts = result.rows;
         console.log(districts);
         res.status(200).json(districts);
@@ -620,8 +620,8 @@ const getLocation = async (req, res) => {
 };
 
 module.exports = {
-    getScheduleWiseTrainDetails,
-    getUniqueTrainDetails,
+    getScheduleWiseAirDetails,
+    getUniqueAirDetails,
     tempBookSeat,
     getLocation,
 };

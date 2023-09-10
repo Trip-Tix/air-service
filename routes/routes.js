@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser').json();
 const adminAirController = require('../controllers/adminAirController');
-const userTrainController = require('../controllers/userTrainController');
+const userTrainController = require('../controllers/userAirController');
 
 
 const router = express.Router();
