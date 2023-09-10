@@ -41,4 +41,6 @@ router.post('/api/getScheduleWiseAirDetails', bodyParser, userAirController.getS
 
 router.post('/api/getUniqueAirDetails', bodyParser, userAirController.getUniqueAirDetails);
 
+router.post('/api/temporaryBookTicket', bodyParser, userAirController.tempBookSeat);
+
 module.exports = router;

@@ -343,13 +343,21 @@ const tempBookSeat = async (req, res) => {
 
             for (let i = 0; i < ticketInfo.length; i++) {
                 const ticket = ticketInfo[i];
-                const { airScheduleId, passengerInfo, source, destination, airFare } = ticket;
+                const { airScheduleId, passengerInfo, source, destination, airFare, classId } = ticket;
                 const ticketId = Math.random().toString().substring(2, 17);
 
                 console.log("passengerInfo: ", passengerInfo);
 
                 // Generate unique ticket ID of 15 characters length with numbers only
 
+                // Get the air ticket fare 
+                const getAirTicketFareQuery = {
+                    text: `SELECT air_fare FROM air_schedule_info WHERE air_schedule_id = $1`,
+                    values: [airScheduleId],
+                };
+                const getAirTicketFareResult = await airPool.query(
+                    getAirTicketFareQuery
+                );
                 const airTicketFare = airFare;
 
                 let perValidTicketFare = 0;
@@ -478,9 +486,9 @@ const tempBookSeat = async (req, res) => {
                     const numTickets = passengerIdArray.length;
                     const insertIntoTicketInfoQuery = {
                         text: `INSERT INTO ticket_info (ticket_id, user_id, air_schedule_id, 
-                            number_of_tickets, total_fare, passenger_info, date, source, destination) 
+                            number_of_tickets, total_fare, passenger_info, date, source, destination, class_id) 
                             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                        values: [ticketId, userId, airScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, source, destination]
+                        values: [ticketId, userId, airScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, source, destination, classId]
                     }
                     await airPool.query(insertIntoTicketInfoQuery);
                     console.log("Temporary Ticket added successfully");
@@ -498,8 +506,8 @@ const tempBookSeat = async (req, res) => {
                     const queueTicketId = Math.random().toString().substring(2, 17);
                     const insertIntoTicketQueueQuery = {
                         text: `INSERT INTO ticket_queue 
-                        (queue_ticket_id, user_id, total_fare, air_schedule_id, number_of_tickets, passenger_info, air_seat_id, date, source, destination)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                        (queue_ticket_id, user_id, total_fare, air_schedule_id, number_of_tickets, passenger_info, air_seat_id, date, source, destination, class_id)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
                         values: [
                             queueTicketId,
                             userId,
