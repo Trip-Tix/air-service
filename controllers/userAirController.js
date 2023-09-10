@@ -143,6 +143,7 @@ const getScheduleWiseAirDetails = async (req, res) => {
                 responseObj.air_company_id = airId;
                 responseObj.number_of_seats = numberOfSeats;
                 responseObj.available_seat_count = availableSeatCount;
+                responseObj.class_id = classId;
 
                 responseData.push(responseObj);
                 
