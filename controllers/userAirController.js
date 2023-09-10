@@ -78,7 +78,7 @@ const getScheduleWiseAirDetails = async (req, res) => {
             );
             const airCompanyName = getAirCompanyNameResult.rows[0].air_company_name;
 
-            // Get the class info from air_coach info table
+            // Get the class info from air_class info table
             const getCoachInfoQuery = {
                 text: `SELECT class_info, facilities FROM air_class_details 
                 WHERE unique_air_id = $1`,
@@ -166,7 +166,7 @@ const getUniqueAirDetails = async (req, res) => {
     console.log("getUniqueAirDetails called from air-service");
 
     // Get the token
-    const { token, uniqueAirId, airId, airScheduleId } = req.body;
+    const { token, uniqueAirId, airId, airScheduleId, classId } = req.body;
     if (!token) {
         console.log("No token provided");
         return res.status(401).json({ message: "No token provided" });
@@ -179,28 +179,14 @@ const getUniqueAirDetails = async (req, res) => {
             return res.status(500).json({ message: "Failed to authenticate token" });
         }
 
-        // Get the air class id
-        const getAirCoachIdQuery = {
-            text: `SELECT air_coach_info.air_coach_id, air_coach_details.class_id, air_coach_details.brand_name_id 
-            FROM air_coach_info
-            INNER JOIN air_coach_details ON air_coach_info.class_id = air_coach_details.class_id 
-            AND air_coach_info.air_company_id = air_coach_details.air_company_id 
-            AND air_coach_info.brand_name_id = air_coach_details.brand_name_id
-            WHERE air_coach_details.unique_air_id = $1
-            AND air_coach_details.air_company_id = $2`,
-            values: [uniqueAirId, airId],
-        };
-        const getAirCoachIdResult = await airPool.query(getAirCoachIdQuery);
-        const airCoachId = getAirCoachIdResult.rows[0].air_coach_id;
-        console.log("airCoachId: ", airCoachId);
 
         // Get the air layout id
         const getAirLayoutIdQuery = {
             text: `SELECT air_layout_id, number_of_seats, row, col
             FROM air_layout_info
-            WHERE air_coach_id = $1
+            WHERE air_class_id = $1
             AND air_company_id = $2`,
-            values: [airCoachId, airId],
+            values: [classId, airId],
         };
         const getAirLayoutIdResult = await airPool.query(getAirLayoutIdQuery);
         const airLayoutId = getAirLayoutIdResult.rows[0].air_layout_id;
@@ -222,7 +208,7 @@ const getUniqueAirDetails = async (req, res) => {
 
         // Get the schedule seat details
         const getScheduleSeatDetailsQuery = {
-            text: `SELECT air_schedule_seat_id, air_seat_id, booked_status, passenger_id 
+            text: `SELECT air_schedule_seat_id, air_seat_id, booked_status, passenger_id, passenger_gender  
             FROM air_schedule_seat_info
             WHERE air_schedule_id = $1 
             AND air_layout_id = $2`,
@@ -586,7 +572,7 @@ const getLocation = async (req, res) => {
     try {
         console.log("getDistricts called from air-service");
         const query = {
-            text: "SELECT location_id, station_name AS location_name FROM location_info",
+            text: "SELECT location_id, location_name FROM location_info",
         };
         const result = await airPool.query(query);
         const districts = result.rows;
