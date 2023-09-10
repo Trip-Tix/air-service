@@ -580,7 +580,7 @@ const getLocation = async (req, res) => {
     try {
         console.log("getDistricts called from air-service");
         const query = {
-            text: "SELECT location_id, CONCAT (location_name || ' - ' || airport_name) FROM location_info",
+            text: "SELECT location_id, CONCAT (location_name || ' - ' || airport_name) AS location_name FROM location_info",
         };
         const result = await airPool.query(query);
         const districts = result.rows;
