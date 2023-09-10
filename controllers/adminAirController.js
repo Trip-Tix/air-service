@@ -393,9 +393,10 @@ const getAirInfo = async (req, res) => {
 
             // Get the unique air id list
             const uniqueAirIdQuery = {
-                text: 'SELECT unique_air_id, class_info, facilities, number_of_seats FROM air_class_details WHERE air_company_id = $1',
+                text: 'SELECT unique_air_id, class_info, facilities, number_of_seats, status FROM air_class_details WHERE air_company_id = $1',
                 values: [airId]
             };
+            
             const uniqueAirIdResult = await airPool.query(uniqueAirIdQuery);
             const uniqueAirIdList = uniqueAirIdResult.rows;
 
