@@ -179,16 +179,17 @@ const getUniqueAirDetails = async (req, res) => {
             return res.status(500).json({ message: "Failed to authenticate token" });
         }
 
-
-        // Get the air layout id
+        try {
+            // Get the air layout id
         const getAirLayoutIdQuery = {
             text: `SELECT air_layout_id, number_of_seats, row, col
             FROM air_layout_info
-            WHERE air_class_id = $1
+            WHERE class_id = $1
             AND air_company_id = $2`,
             values: [classId, airId],
         };
         const getAirLayoutIdResult = await airPool.query(getAirLayoutIdQuery);
+        console.log("getAirLayoutIdResult: ", getAirLayoutIdResult.rows);
         const airLayoutId = getAirLayoutIdResult.rows[0].air_layout_id;
         const numberOfSeats = getAirLayoutIdResult.rows[0].number_of_seats;
         const row = getAirLayoutIdResult.rows[0].row;
@@ -252,7 +253,7 @@ const getUniqueAirDetails = async (req, res) => {
                 let seatId = seat.air_seat_id;
                 for (let j = 0; j < seatDetails.length; j++) {
                     if (seatId === seatDetails[j].air_seat_id) {
-                        if (seat.passenger_gender === "M") {
+                        if (seat.passenger_gender === "Male") {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 4;
                         } else {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 5;
@@ -266,7 +267,7 @@ const getUniqueAirDetails = async (req, res) => {
                 let seatId = seat.air_seat_id;
                 for (let j = 0; j < seatDetails.length; j++) {
                     if (seatId === seatDetails[j].air_seat_id) {
-                        if (seat.passenger_gender === "M") {
+                        if (seat.passenger_gender === "Male") {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 2;
                         } else {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 3;
@@ -283,6 +284,12 @@ const getUniqueAirDetails = async (req, res) => {
         return res
             .status(200)
             .json({ layout, seatName, airSeatId, numberOfSeats, availableSeatCount });
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json(error);
+        }
+
+        
     });
 };
 
@@ -572,7 +579,7 @@ const getLocation = async (req, res) => {
     try {
         console.log("getDistricts called from air-service");
         const query = {
-            text: "SELECT location_id, location_name FROM location_info",
+            text: "SELECT location_id, CONCAT (location_name || ' - ' || airport_name) FROM location_info",
         };
         const result = await airPool.query(query);
         const districts = result.rows;

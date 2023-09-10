@@ -39,4 +39,6 @@ router.post('/api/getLocations', bodyParser, userAirController.getLocation);
 
 router.post('/api/getScheduleWiseAirDetails', bodyParser, userAirController.getScheduleWiseAirDetails);
 
+router.post('/api/getUniqueAirDetails', bodyParser, userAirController.getUniqueAirDetails);
+
 module.exports = router;
