@@ -854,6 +854,24 @@ const getCountOfAllUniqueAirs = async (req, res) => {
 }
 
 
+const getUserCountOfAllUniqueAirs = async (req, res) => {
+    try {
+        
+        // Query the air_class_details table to count distinct unique_air_id
+        const countUniqueAirsQuery = {
+            text: 'SELECT COUNT(DISTINCT unique_air_id) FROM air_class_details',
+        };
+        const countResult = await airPool.query(countUniqueAirsQuery);
+        const totalCount = countResult.rows[0].count;
+        console.log("Total unique airs:", totalCount);
+        
+        res.status(200).json({ totalUniqueBuses: totalCount });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 module.exports = {
     getClassInfo,
     addClassInfo,
@@ -866,5 +884,6 @@ module.exports = {
     addAirScheduleInfo,
     updateAirStatus,
     getCountOfAllUniqueAirs,
+    getUserCountOfAllUniqueAirs
 }
 

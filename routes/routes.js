@@ -48,4 +48,6 @@ router.post('/api/temporaryBookTicket', bodyParser, userAirController.tempBookSe
 
 router.post('/api/admin/getAllUniqueAirCount', bodyParser, adminAirController.getCountOfAllUniqueAirs);
 
+router.post('/api/admin/getAllAirCountUser', bodyParser, adminAirController.getUserCountOfAllUniqueAirs);
+
 module.exports = router;
