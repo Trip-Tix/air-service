@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser').json();
 const adminAirController = require('../controllers/adminAirController');
+const userAirController = require('../controllers/userAirController');
 
 
 const router = express.Router();
@@ -34,9 +35,15 @@ router.post('/api/admin/getAvailableAir', bodyParser, adminAirController.getAvai
 // Add air schedule info from admin
 router.post('/api/admin/addAirScheduleInfo', bodyParser, adminAirController.addAirScheduleInfo);
 
-
 // Update Flight Status
 router.post('/api/admin/updateAirStatus', bodyParser, adminAirController.updateAirStatus);
 
+router.post('/api/getLocations', bodyParser, userAirController.getLocation);
+
+router.post('/api/getScheduleWiseAirDetails', bodyParser, userAirController.getScheduleWiseAirDetails);
+
+router.post('/api/getUniqueAirDetails', bodyParser, userAirController.getUniqueAirDetails);
+
+router.post('/api/temporaryBookTicket', bodyParser, userAirController.tempBookSeat);
 
 module.exports = router;

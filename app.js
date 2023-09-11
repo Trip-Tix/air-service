@@ -2,8 +2,6 @@ const express = require('express');
 const dotenv = require('dotenv');
 const router = require('./routes/routes');
 const cors = require('cors');
-const startAdminCreationConsumer = require('./consumer/messageConsumer.js');
-
 
 dotenv.config();
 
