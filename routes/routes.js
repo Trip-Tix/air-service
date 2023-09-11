@@ -35,6 +35,9 @@ router.post('/api/admin/getAvailableAir', bodyParser, adminAirController.getAvai
 // Add air schedule info from admin
 router.post('/api/admin/addAirScheduleInfo', bodyParser, adminAirController.addAirScheduleInfo);
 
+// Update Flight Status
+router.post('/api/admin/updateAirStatus', bodyParser, adminAirController.updateAirStatus);
+
 router.post('/api/getLocations', bodyParser, userAirController.getLocation);
 
 router.post('/api/getScheduleWiseAirDetails', bodyParser, userAirController.getScheduleWiseAirDetails);
