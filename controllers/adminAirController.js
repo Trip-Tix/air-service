@@ -804,6 +804,56 @@ const updateAirStatus = async (req, res) => {
     });
 }
 
+
+
+const getCountOfAllUniqueAirs = async (req, res) => {
+    // get the token from the request body
+    const { token, airCompanyName } = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getCountOfAllUniqueAirs called from air-service");
+
+                // get the air id from air company name
+                const airIdQuery = {
+                    text: 'SELECT air_company_id FROM air_services WHERE air_company_name = $1',
+                    values: [airCompanyName]
+                };
+                const airIdResult = await airPool.query(airIdQuery);
+                const airId = airIdResult.rows[0].air_company_id;
+                console.log("Air id", airId);
+                
+                // Query the air_class_details table to count distinct unique_air_id
+                const countUniqueAirsQuery = {
+                    text: 'SELECT COUNT(DISTINCT unique_air_id) FROM air_class_details where air_company_id = $1',
+                    values: [airId]
+                };
+                const countResult = await airPool.query(countUniqueAirsQuery);
+                const totalCount = countResult.rows[0].count;
+                console.log("Total unique airs:", totalCount);
+                
+                res.status(200).json({ totalUniqueAirs: totalCount });
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+
 module.exports = {
     getClassInfo,
     addClassInfo,
@@ -815,5 +865,6 @@ module.exports = {
     getAvailableAir,
     addAirScheduleInfo,
     updateAirStatus,
+    getCountOfAllUniqueAirs,
 }
 

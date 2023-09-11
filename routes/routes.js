@@ -46,4 +46,6 @@ router.post('/api/getUniqueAirDetails', bodyParser, userAirController.getUniqueA
 
 router.post('/api/temporaryBookTicket', bodyParser, userAirController.tempBookSeat);
 
+router.post('/api/admin/getAllUniqueAirCount', bodyParser, adminAirController.getCountOfAllUniqueAirs);
+
 module.exports = router;
