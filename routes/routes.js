@@ -52,4 +52,6 @@ router.post('/api/admin/getAllAirCountUser', bodyParser, adminAirController.getU
 
 router.post('/getAirSeatFareStat', bodyParser, userAirController.getAirSeatFareStat);
 
+router.post('/api/cancelTicket', bodyParser, userAirController.cancel);
+
 module.exports = router;

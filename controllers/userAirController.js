@@ -576,6 +576,138 @@ const getLocation = async (req, res) => {
     }
 };
 
+// Check temporary booked seat
+const cancel = async (req, res) => {
+    console.log('cancel called from air-service');
+    console.log('req.body: ', req.body);
+
+    const { ticketId } = req.body;
+
+    try {
+
+        const currentTime = new Date().getTime();
+
+        // Get the airScheduleId from ticketId
+        const getBusScheduleIdQuery = {
+            text: `SELECT air_schedule_id
+                        FROM ticket_info
+                        WHERE ticket_id = $1`,
+            values: [ticketId]
+        }
+        const getBusScheduleIdResult = await airPool.query(getBusScheduleIdQuery);
+
+        if (getBusScheduleIdResult.rows.length === 0) {
+            // delete from ticket queue
+            const deleteFromQueueQuery = {
+                text: `DELETE FROM ticket_queue
+                        WHERE queue_ticket_id = $1`,
+                values: [ticketId]
+            }
+            await airPool.query(deleteFromQueueQuery);
+
+            return res.status(200).json({ message: 'Ticket cancelled successfully' });
+        }
+
+        const airScheduleId = getBusScheduleIdResult.rows[0].air_schedule_id;
+        const bookedStatus = getBusScheduleIdResult.rows[0].booked_status;
+
+        // Remove from ticket_info
+        const removeFromTicketInfoQuery = {
+            text: `DELETE FROM ticket_info
+                        WHERE ticket_id = $1`,
+            values: [ticketId]
+        }
+        await airPool.query(removeFromTicketInfoQuery);
+
+        // Update status to 0
+        const updateStatusQuery = {
+            text: `UPDATE air_schedule_seat_info
+                        SET booked_status = 0, user_id = NULL, ticket_id = NULL, booking_time = NULL, passenger_id = NULL, passenger_gender = NULL  
+                        WHERE ticket_id = $1`,
+            values: [ticketId]
+        }
+        await airPool.query(updateStatusQuery);
+
+        if (bookedStatus === 1) {
+            // Search in ticket_queue with air_schedule_id
+            const getExpiredBusSeatIdQuery = {
+                text: `SELECT *
+                        FROM ticket_queue
+                        WHERE air_schedule_id = $1 ORDER BY date ASC`,
+                values: [airScheduleId]
+            }
+            const getExpiredBusSeatIdResult = await airPool.query(getExpiredBusSeatIdQuery);
+            const queueInfo = getExpiredBusSeatIdResult.rows;
+
+            if (queueInfo.length === 0) {
+                return res.status(200).json({ message: 'No queue found' });
+            }
+
+            const expiredTicket = queueInfo[0];
+            const userId = expiredTicket.user_id;
+
+
+            // Insert into ticket_info
+            const insertTicketInfoQuery = {
+                text: `INSERT INTO ticket_info (ticket_id, user_id, total_fare, air_schedule_id, number_of_tickets, passenger_info, date, source, destination, class_id)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ticket_id`,
+                values: [expiredTicket.queue_ticket_id, expiredTicket.user_id, expiredTicket.total_fare, expiredTicket.air_schedule_id, expiredTicket.number_of_tickets, expiredTicket.passenger_info, expiredTicket.date, expiredTicket.source, expiredTicket.destination, expiredTicket.class_id]
+            }
+            const insertTicketInfoResult = await airPool.query(insertTicketInfoQuery);
+
+            // Remove from ticket_queue
+            const removeFromTicketQueueQuery = {
+                text: `DELETE FROM ticket_queue
+                                    WHERE queue_ticket_id = $1`,
+                values: [expiredTicket.queue_ticket_id]
+            }
+            await airPool.query(removeFromTicketQueueQuery);
+
+            const expiredSeatIdArray = expiredTicket.air_seat_id;
+
+            // Update status to 1
+            for (let i = 0; i < expiredSeatIdArray.length; i++) {
+                const updateStatusQuery = {
+                    text: `UPDATE air_schedule_seat_info
+                            SET user_id = $1, booked_status = 1, ticket_id = $2, booking_time = $3
+                            WHERE air_schedule_id = $4
+                            AND air_seat_id = $5`,
+                    values: [userId, expiredTicket.queue_ticket_id, currentTime, airScheduleId, expiredSeatIdArray[i]]
+                }
+                await airPool.query(updateStatusQuery);
+            }
+
+            console.log('Ticket cancelled successfully');
+
+            // Get user email
+            const getUserEmailQuery = {
+                text: `SELECT email
+                        FROM user_info
+                        WHERE user_id = $1`,
+                values: [userId]
+            }
+            const getUserEmailResult = await accountPool.query(getUserEmailQuery);
+            const userEmail = getUserEmailResult.rows[0].email;
+
+            // Send ticket to user email
+            const mailOptions = {
+                from: 'triptix.sfz@gmail.com',
+                to: userEmail,
+                subject: `${ticketId} Ticket`,
+                text: 'Your ticket is free! Go to dashboard to proceed to payment',
+            };
+            await transporter.sendMail(mailOptions);
+            console.log('Ticket sent to user email');
+        }
+
+
+        return res.status(200).json({ message: 'Ticket cancelled successfully' });
+    } catch (error) {
+        console.log('error: ', error);
+        return res.status(500).json(error);
+    }
+}
+
 
 
 
@@ -666,4 +798,5 @@ module.exports = {
     tempBookSeat,
     getLocation,
     getAirSeatFareStat,
+    cancel
 };
