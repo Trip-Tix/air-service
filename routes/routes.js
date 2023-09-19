@@ -50,4 +50,6 @@ router.post('/api/admin/getAllUniqueAirCount', bodyParser, adminAirController.ge
 
 router.post('/api/admin/getAllAirCountUser', bodyParser, adminAirController.getUserCountOfAllUniqueAirs);
 
+router.post('/getAirSeatFareStat', bodyParser, userAirController.getAirSeatFareStat);
+
 module.exports = router;

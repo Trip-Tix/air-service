@@ -576,9 +576,94 @@ const getLocation = async (req, res) => {
     }
 };
 
+
+
+
+const getAirSeatFareStat = async (req, res) => {
+    const { src, dest, date } = req.body;
+
+    try {
+        console.log("getAirSeatFareStat called from air-service");
+        console.log(req.body);
+
+        const dateParts = date.split('-');
+        const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`; // yyyy-mm-dd
+
+        console.log('isoDate: ', isoDate);
+
+        // Get air_schedule_id for the given date, src, and dest
+        const scheduleQuery = {
+            text: 'SELECT air_schedule_id, air_fare FROM air_schedule_info WHERE starting_point = $1 AND ending_point = $2 AND schedule_date = $3',
+            values: [src, dest, isoDate]
+        };
+        
+        const scheduleResult = await airPool.query(scheduleQuery);
+        console.log('scheduleResult: ', scheduleResult.rows);
+
+        if (scheduleResult.rows.length === 0) {
+            return res.status(200).json({
+                totalSeats: 0,
+                bookedSeats: 0,
+                avgFare: 0
+            });
+        }
+
+        let totalSeats = 0;
+        let bookedSeats = 0;
+        let avgFare = 0;
+
+        for (let i = 0; i < scheduleResult.rows.length; i++) {
+            const schedule = scheduleResult.rows[i];
+            const airScheduleId = schedule.air_schedule_id;
+            const airFare = schedule.air_fare;
+
+            // Get total seats for the air
+            const seatsQuery = {
+                text: 'SELECT COUNT(air_seat_id) as booked_seats FROM air_schedule_seat_info WHERE air_schedule_id = $1',
+                values: [airScheduleId]
+            };
+
+            const seatsResult = await airPool.query(seatsQuery);
+            totalSeats += parseInt(seatsResult.rows[0].booked_seats, 10);
+
+            // Get total booked seats for the air
+            const bookedSeatsQuery = {
+                text: 'SELECT COUNT(air_seat_id) as booked_seats FROM air_schedule_seat_info WHERE air_schedule_id = $1 AND booked_status = 2',
+                values: [airScheduleId]
+            };
+            const bookedSeatsResult = await airPool.query(bookedSeatsQuery);
+            bookedSeats += parseInt(bookedSeatsResult.rows[0].booked_seats, 10);
+
+            let totalFare = 0;
+
+            console.log('airFare: ', airFare);
+
+            for (let j = 0; j < airFare.length; j++) {
+                totalFare += airFare[j];
+            }
+
+            avgFare +=  totalFare / airFare.length;
+            
+        }
+
+        avgFare = avgFare / scheduleResult.rows.length;        
+        
+        res.status(200).json({
+            totalSeats: totalSeats,
+            bookedSeats: bookedSeats,
+            avgFare: avgFare
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getScheduleWiseAirDetails,
     getUniqueAirDetails,
     tempBookSeat,
     getLocation,
+    getAirSeatFareStat,
 };
