@@ -709,9 +709,6 @@ const cancel = async (req, res) => {
     }
 }
 
-
-
-
 const getAirSeatFareStat = async (req, res) => {
     const { src, dest, date } = req.body;
 
