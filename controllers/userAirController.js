@@ -465,14 +465,15 @@ const tempBookSeat = async (req, res) => {
                         passengerIdArray.push(passengerId);
                         const tempBookSeatQuery = {
                             text: `UPDATE air_schedule_seat_info
-                        SET booked_status = 1, passenger_id = $1, passenger_gender = $2, booking_time = $3, ticket_id = $4  
-                        WHERE air_schedule_id = $5
-                        AND air_seat_id = $6`,
+                        SET booked_status = 1, passenger_id = $1, passenger_gender = $2, booking_time = $3, ticket_id = $4, user_id = $5  
+                        WHERE air_schedule_id = $6
+                        AND air_seat_id = $7`,
                             values: [
                                 passengerId,
                                 passengerGender,
                                 bookingTimestamp,
                                 ticketId,
+                                userId,
                                 airScheduleId,
                                 airSeatId,
                             ],
