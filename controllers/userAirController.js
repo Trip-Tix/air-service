@@ -385,9 +385,9 @@ const tempBookSeat = async (req, res) => {
 
                     // Age calculation
                     const passengerDobParts = passengerDob.split("-");
-                    const passengerDobYear = parseInt(passengerDobParts[2]);
+                    const passengerDobYear = parseInt(passengerDobParts[0]);
                     const passengerDobMonth = parseInt(passengerDobParts[1]);
-                    const passengerDobDate = parseInt(passengerDobParts[0]);
+                    const passengerDobDate = parseInt(passengerDobParts[2]);
 
                     const today = new Date();
                     const todayYear = today.getFullYear();
